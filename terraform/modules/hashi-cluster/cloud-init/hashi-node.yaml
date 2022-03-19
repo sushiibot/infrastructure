@@ -1,0 +1,34 @@
+#cloud-config
+
+write_files:
+- path: /etc/consul.d/consul.hcl
+  permissions: 0644
+  owner: root
+  content: |
+    data_dir = "/tmp/consul"
+    encrypt = "${consul_secret_key}"
+    advertise_addr = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
+    retry_join = ["172.16.1.9"]
+    retry_interval = "5s"
+    node_name = "dataplane"
+    enable_central_service_config = true
+- path: /etc/nomad.d/nomad.hcl
+  permissions: 0644
+  owner: root
+  content: |
+    data_dir  = "/etc/nomad.d"
+    bind_addr = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
+    client {
+      enabled           = true
+      network_interface = "eth1"
+      meta {
+        instance_group  = "dataplane"
+      }
+    }
+    addresses {
+      http = "127.0.0.1"
+    }
+runcmd:
+- [ systemctl, daemon-reload ]
+- [ systemctl, restart, consul ] 
+- [ systemctl, restart, nomad ] 
