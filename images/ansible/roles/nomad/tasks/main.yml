@@ -5,5 +5,5 @@
 - name: Install nomad
   import_tasks: install.yml
 
-- name: Setup Consul agent
+- name: Setup Nomad agent
   import_tasks: agent.yml
