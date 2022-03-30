@@ -30,3 +30,8 @@ variable "server_type" {
   description = "The server type to use. Defaults to cxp11."
   default     = "cxp11"
 }
+
+variable "network_zone" {
+  description = "The network zone for internal subnet. Defaults to us-east"
+  default     = "us-east"
+}

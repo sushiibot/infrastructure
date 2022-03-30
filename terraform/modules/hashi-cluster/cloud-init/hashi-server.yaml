@@ -1,5 +1,25 @@
 #cloud-config
 
+groups:
+  - consul
+  - nomad
+users:
+  - name: ${username}
+    ssh-authorized-keys:
+      - ${ssh_public_key}
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups: sudo
+    shell: /bin/bash
+  - name: consul
+    groups: consul
+    shell: /bin/bash
+  # https://learn.hashicorp.com/tutorials/nomad/production-deployment-guide-vm-with-consul#install-nomad
+  # Server as nomad user
+  - name: nomad
+    groups: nomad
+    shell: /bin/false
+    system: true
+    home: /etc/nomad.d
 write_files:
 - path: /etc/consul.d/consul.hcl
   permissions: 0644
@@ -30,7 +50,24 @@ write_files:
     addresses {
       http = "127.0.0.1"
     }
+    advertise {
+      http = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
+      rpc = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
+      serf = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
+    }
+    consul {
+      address             = "127.0.0.1:8500"
+      server_service_name = "nomad"
+      client_service_name = "nomad-client"
+      auto_advertise      = true
+      server_auto_join    = true
+      client_auto_join    = true
+    }
+    ui {
+      enabled =  true
+    }
 runcmd:
-- [ systemctl, daemon-reload ]
-- [ systemctl, restart, consul ] 
-- [ systemctl, restart, nomad ] 
+  - mkdir - /opt/nomad
+  - [ systemctl, daemon-reload ]
+  - [ systemctl, restart, consul ] 
+  - [ systemctl, restart, nomad ] 

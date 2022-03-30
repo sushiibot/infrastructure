@@ -1,5 +1,25 @@
 #cloud-config
 
+groups:
+  - consul
+  - nomad
+users:
+  - name: ${username}
+    ssh-authorized-keys:
+      - ${ssh_public_key}
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups: sudo
+    shell: /bin/bash
+  - name: consul
+    groups: consul
+    shell: /bin/bash
+  # https://learn.hashicorp.com/tutorials/nomad/production-deployment-guide-vm-with-consul#install-nomad
+  # Client as root
+  - name: nomad
+    groups: nomad, sudo
+    shell: /bin/false
+    system: true
+    home: /etc/nomad.d
 write_files:
 - path: /etc/consul.d/consul.hcl
   permissions: 0644
@@ -8,7 +28,7 @@ write_files:
     data_dir = "/tmp/consul"
     encrypt = "${consul_secret_key}"
     advertise_addr = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
-    retry_join = ["172.16.1.9"]
+    retry_join = ["10.0.1.1"]
     retry_interval = "5s"
     node_name = "dataplane"
     enable_central_service_config = true
@@ -18,9 +38,14 @@ write_files:
   content: |
     data_dir  = "/etc/nomad.d"
     bind_addr = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
+    advertise {
+      http = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
+      rpc = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
+      serf = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
+    }
     client {
       enabled           = true
-      network_interface = "eth1"
+      network_interface = "eth0"
       meta {
         instance_group  = "dataplane"
       }
@@ -28,7 +53,14 @@ write_files:
     addresses {
       http = "127.0.0.1"
     }
+    ui {
+      enabled =  true
+      consul {
+        ui_url = "https://consul.sushii.xyz:8500/ui"
+      }
+    }
 runcmd:
-- [ systemctl, daemon-reload ]
-- [ systemctl, restart, consul ] 
-- [ systemctl, restart, nomad ] 
+  - mkdir - /opt/nomad
+  - [ systemctl, daemon-reload ]
+  - [ systemctl, restart, consul ] 
+  - [ systemctl, restart, nomad ] 
